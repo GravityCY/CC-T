@@ -2,6 +2,10 @@ local periphutils = {}
 
 local prevFind = peripheral.find
 
+local function PeriphIsSide(addr)
+    return addr == "top" or addr == "left" or addr == "right" or addr == "bottom" or addr == "back" or addr == "front"
+end
+
 -- Will find all peripherals of the type peripheralName and call a method given
 function periphutils.Call(peripheralName, method, ...)
     local periph = {peripheral.find(peripheralName)}
@@ -36,20 +40,24 @@ function periphutils.GetWifiModem()
     end
 end
 
-function peripheral.find(name)
-    local found = prevFind(name)
-
+function peripheral.find(name, notComputer)
+    notComputer = notComputer or false
+    
+    local found = {prevFind(name)}
+    
     local uFound = {}
     local foundAddr = {}
 
     for index, periph in ipairs(found) do
         local addr = peripheral.getName(periph)
-        if foundAddr[addr] == nil then
-            table.insert(uFound, periph)
-            foundAddr[addr] = true
+        if not PeriphIsSide(addr) then
+            if foundAddr[addr] == nil then
+                table.insert(uFound, periph)
+                foundAddr[addr] = true
+            end
         end
     end
-    return uFound
+    return unpack(uFound)
 end
 
 return periphutils

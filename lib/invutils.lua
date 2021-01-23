@@ -10,11 +10,18 @@ end
 
 -- Will return all currently connected chests
 function invUtils.GetAllChests()
-    return peripheral.find("minecraft:chest")
+    return {peripheral.find("minecraft:chest", true)}
+end
+
+function invUtils.GetItemSlot(inventory, itemName)
+    for slot, item in pairs(inventory.list()) do
+        if item.name == itemName then return slot end
+    end
 end
 
 -- Will detect a difference in size of an inventory
-function invUtils.GetChestUpdate(addrs, ...)   
+function invUtils.GetChestUpdate(sleepTime, addrs, ...)   
+    sleepTime = sleepTime or 0
     local chests = {}
     local prevSizes = {}
     local notThese = table.ToKeyTable({...})
@@ -35,21 +42,38 @@ function invUtils.GetChestUpdate(addrs, ...)
                 if size ~= prevSize then return currentAddr end 
             end
         end
-        os.sleep(0.5)
+        os.sleep(sleepTime)
     end
 end
 
 -- Will push all items from an inventory to another
-function invUtils.PushAll(from, to, amount)
+function invUtils.PushAll(from, to)
     if from == nil or to == nil then return end
-    local tempTo = nil
-    if type(from) == "string" then from = peripheral.wrap(from) end
-    if type(to) == "table" then tempTo = peripheral.getName(to)
-    else tempTo = to end
+
     amount = amount or 1
+    local tempTo = to
+    local tempFrom = from
+    if type(from) == "string" then tempFrom = peripheral.wrap(from) end
+    if type(to) == "table" then tempTo = peripheral.getName(to) end
 
     for slot, item in pairs(from.list()) do
-        from.pushItems(tempTo, slot, amount)
+        tempFrom.pushItems(tempTo, slot, 64)
+    end
+end
+
+function invUtils.PushAllMulti(from, toInventories)
+    if from == nil or toInventories == nil then return end
+
+    amount = amount or 1
+
+    for key, inventory in pairs(toInventories) do
+        local invAddr = inventory
+        if type(inventory) == "table" then invAddr = peripheral.getName(inventory) end
+        local itemsLeft = invUtils.ItemCount(from)
+        for slot, item in pairs(from.list()) do
+            itemsLeft = itemsLeft - from.pushItems(invAddr, slot, 64)
+            if itemsLeft <= 0 then return true end
+        end
     end
 end
 
@@ -63,9 +87,11 @@ end
 -- Will return how many items an inventory has
 function invUtils.ItemCount(inventory)
     if inventory == nil then return end
+    local tempInventory = inventory
+    if type(inventory) == "string" then tempInventory = peripheral.wrap(inventory) end
 
     local total = 0
-    for slot, item in pairs(inventory.list()) do
+    for slot, item in pairs(tempInventory.list()) do
         total = total + item.count 
     end
     return total
@@ -102,7 +128,7 @@ end
 
 -- Will return an amount of an item
 function invUtils.CountItem(itemName, ...)
-    local chests = GetAllChests()
+    local chests = invUtils.GetAllChests()
     local count = 0
     itemName = itemName:lower()
     for i, chest in ipairs(chests) do
@@ -119,7 +145,7 @@ end
 -- Will get an item based on registed id
 -- Possible way to improve is to estimate similarity of id to provided item name and work with that
 function invUtils.GetItem(inputAddr, itemName, itemCount)
-    local chests = GetAllChests()
+    local chests = invUtils.GetAllChests()
     itemName = itemName:lower()
     local foundCount = 0
     for index,chest in ipairs(chests) do
@@ -140,7 +166,7 @@ end
 
 -- Will get an item based on display name but is WAY slower
 function invUtils.GetItemSlow(inputAddr, itemName, itemCount)
-    local chests = GetAllChests()
+    local chests = invUtils.GetAllChests()
     itemName = itemName:lower()
 
     local foundCount = 0
@@ -163,7 +189,7 @@ end
 function invUtils.ListItems(filter)
     if filter ~= nil then filter = filter:lower() end
     local items = {}
-    local chests = GetAllChests()
+    local chests = invUtils.GetAllChests()
     for i, chest in ipairs(chests) do
         for slot, item in pairs(chest.list()) do
             local formName = FormatName(item.name)

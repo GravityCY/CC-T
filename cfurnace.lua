@@ -7,14 +7,18 @@ debug.print = true
 local unsortedChests = {peripheral.find("minecraft:chest")}
 local unsortedAddrs = {}
 
--- Contains the addresses sequentally
-local iChestAddr = nil
-local oChestAddr = nil
-local cChestAddr = nil
 -- Contains the chests sequentally
 local iChest = nil
 local oChest = nil
 local cChest = nil
+local bChest = nil
+local dispenser = peripheral.find("minecraft:dispenser")
+-- Contains the addresses sequentally
+local iChestAddr = nil
+local oChestAddr = nil
+local cChestAddr = nil
+local bChestAddr = nil
+local dispenserAddr = peripheral.getName(dispenser)
 
 local pullEvent = os.pullEvent
 
@@ -24,19 +28,24 @@ function os.pullEvent()
     return event, a, b, c, d
 end
 
+local arg = ...
+
 local function Setup()
     for index, chest in ipairs(unsortedChests) do
         table.insert(unsortedAddrs, peripheral.getName(chest))
     end
-    print("Add any item into the input chest and then into the output chest")
-    iChestAddr = iUtils.GetChestUpdate(unsortedAddrs)
+    print("Add any item into the input chest, then into the output and finally into the buffer chest")
+    iChestAddr = iUtils.GetChestUpdate(0.1, unsortedAddrs)
     print("Marked as input chest")
-    oChestAddr = iUtils.GetChestUpdate(unsortedAddrs, iChestAddr)
+    oChestAddr = iUtils.GetChestUpdate(0.1, unsortedAddrs, iChestAddr)
     print("Marked as output chest")
-    cChestAddr = table.GetNotThis(unsortedAddrs, iChestAddr, oChestAddr)
+    bChestAddr = iUtils.GetChestUpdate(0.1,unsortedAddrs, iChestAddr, oChestAddr)
+    print("Marked as buffer chest")
+    cChestAddr = table.GetNotThis(unsortedAddrs, iChestAddr, oChestAddr, bChestAddr)
     print("Found chute chest")
     iChest = peripheral.wrap(iChestAddr)
     oChest = peripheral.wrap(oChestAddr)
+    bChest = peripheral.wrap(bChestAddr)
     cChest = peripheral.wrap(cChestAddr)
 end
 
@@ -79,24 +88,80 @@ local function Main()
     print("Finished.")
 end
 
+local function SetMode()
+    if arg == nil then return end
+
+    if arg == "smelt" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:lava_bucket")
+        if itemSlot == nil then print("No lava bucket in the buffer chest") error() end
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    elseif arg == "smoke" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:flint_and_steel")
+        if itemSlot == nil then print("No flint and steel in the buffer chest") error() end
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    elseif arg == "wash" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:water_bucket")
+        if itemSlot == nil then print("No water bucket in the buffer chest") error() end
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    end
+end
+
+local function UnsetMode()
+    if arg == nil then return end
+
+    if arg == "smelt" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:bucket")
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    elseif arg == "smoke" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:water_bucket")
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+        os.sleep(1)
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    elseif arg == "wash" then
+        local itemSlot = iUtils.GetItemSlot(bChest, "minecraft:bucket")
+        bChest.pushItems(dispenserAddr, itemSlot, 1, 1)
+        os.sleep(1)
+        bChest.pullItems(dispenserAddr, 1, 1, itemSlot)
+    end
+end
+
 local function Init()
     if fs.exists("/appdata/furnace/addresses.txt") then
         settings.load("/appdata/furnace/addresses.txt")
         iChestAddr = settings.get("input")
         oChestAddr = settings.get("output")
+        bChestAddr = settings.get("buffer")
         cChestAddr = settings.get("chute")
         iChest = peripheral.wrap(iChestAddr)
         oChest = peripheral.wrap(oChestAddr)
+        bChest = peripheral.wrap(bChestAddr)
         cChest = peripheral.wrap(cChestAddr)
     else 
         Setup()
         settings.set("input", iChestAddr)
         settings.set("output", oChestAddr)
+        settings.set("buffer", bChestAddr)
         settings.set("chute", cChestAddr)
         settings.save("/appdata/furnace/addresses.txt") 
+        print("Succesfully setup, please run the program again with the ingredients to process")
+        error()
     end
 
-    Main()
+    SetMode()
+    Main()  
+    UnsetMode()
 end
 
 Init()
