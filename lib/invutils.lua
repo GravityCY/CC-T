@@ -46,6 +46,11 @@ function invUtils.GetChestUpdate(sleepTime, addrs, ...)
     end
 end
 
+-- Will detect a difference in size of an inventory and return the item slot that was changed
+-- Example, player adds 1 dirt to slot 1 returns slot 1
+-- Example, player removes
+-- function invUtils.GetItemUpdate()
+
 -- Will push all items from an inventory to another
 function invUtils.PushAll(from, to)
     if from == nil or to == nil then return end
@@ -118,6 +123,47 @@ function invUtils.Merge(inventory, inventoryAddr)
     for slot, item in pairs(inventory.list()) do
         inventory.pushItems(inventoryAddr, slot, 64)
     end
+end
+
+function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, detailed)
+    if inventory == nil then return end
+    if type(inventory) == "string" then inventory = peripheral.wrap(inventory) end
+
+    startIndex = startIndex or 1
+    endIndex = endIndex or inventory.size()
+    position = position or 1
+    asItem = asItem or false
+    detailed = detailed or false
+
+    local items = inventory.list()
+
+    local pos = 1
+    for slot = startIndex, endIndex do
+        local item = items[slot]
+        if item ~= nil then 
+            if pos == position then
+                if asItem then
+                    if detailed then return inventory.getItemDetail(slot) 
+                    else return item end 
+                else return slot end
+            end
+            pos = pos + 1
+        end
+    end
+end
+
+function invUtils.FirstItemSlot(inventory, startIndex, endIndex, position)
+    startIndex = startIndex or 1
+    endIndex = endIndex or inventory.Size()
+    position = position or 1
+
+    local firstSlot = nil
+    for slot, item in pairs(inventory.list()) do
+        if slot >= startIndex and slot <= endIndex then 
+            if firstSlot == nil or slot < firstSlot then firstSlot = slot end
+        end
+    end
+    return firstSlot
 end
 
 -- Converts an id with _ to space and and first letters to uppercase

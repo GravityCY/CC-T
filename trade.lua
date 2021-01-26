@@ -1,39 +1,19 @@
 local iUtils = require(".lib.invutils")
 local tUtils = require(".lib.tableutils")
 local oUtils = require(".lib.osutils")
-local debug = require(".lib.debug")
 local pUtils = require(".lib.periphutils")
-
-debug.print = true
 
 local modem = pUtils.GetWifiModem()
 local modemAddr = peripheral.getName(modem)
 print(modemAddr)
 rednet.open(modemAddr)
 
-local commands = {add="addproduct", add_already="-addproduct", register_terminal="register"}
+local commands = {add="addproduct", register_terminal="register"}
 
 local regChest = peripheral.wrap("top")
 local serverID = 5
 
-local leftShift = false
-local leftCtrl = false
-local leftAlt = false
-
 local xSize, ySize = term.getSize()
-
-local function Difference(inv_a, inv_b)    
-    local found = false
-    local diff = nil
-    for ka,va in pairs(inv_b) do
-        for kb, vb in pairs(inv_a) do
-            if ka == kb then found = true end
-        end
-        if not found then diff = ka break
-        else found = false end
-    end
-    return diff
-end
 
 local function PrintHelp()
     print("\n-- Commands --")
@@ -57,7 +37,13 @@ local function Blit(text, textColor, backColor)
     local maxX, maxY = term.getSize()
     local termX, termY = term.getCursorPos()
     if termX >= maxX then term.setCursorPos(1, termY+1) end
-    term.blit(text,textColor,backColor)
+    local colorText = ""
+    local backText = ""
+    for i = 1, #text do
+        colorText = colorText .. colors.toBlit(textColor)
+        backColor = backText .. colors.toBlit(backColor)
+    end
+    term.blit(text, colorText, backText)
 end
 
 local function PrintItem(item, compact)
@@ -132,25 +118,6 @@ local function PrintExchange(product, cost, detail)
     end
 end
 
--- Detects whether a chest stored items changed in size positively
-local function DetectAddedItem(chest, detail)
-    detail = detail or false
-
-    -- detects a change in a chest
-    local pItems = chest.list()
-    local pSize = table.SizeOf(pItems)
-
-    while true do
-        os.sleep(0.5)
-        local nItems = chest.list()
-        if pSize < table.SizeOf(nItems) then
-            local difSlot = Difference(pItems, nItems)
-            if detail then return chest.getItemDetail(difSlot)
-            else return nItems[difSlot] end
-        end
-    end
-end
-
 local function RegisterTerminal()
     
 end
@@ -159,49 +126,56 @@ local function RegisterStock(product, cost)
     print("Registered Stock.")
     local pString = ItemToString(product)
     local cString = ItemToString(cost)
-    oUtils.EnableTerminate()
     rednet.send(serverID, "+ " .. os.getComputerID() .. " " .. pString .. " " .. cString, "ts")
-    oUtils.DisableTerminate()
 end
 
-local function AddItem(ready)
-    ready = ready or false
+-- Will try to find items in the registry chest
+local function FindRegItems()
+    local stockItems = {}
 
-    -- make it find the first item
-    local product = iUtils.FirstItem(regChest, _, _, _, true)
-    local pCount = 1
-    -- make it find the next item after the first item
-    local cost = iUtils.FirstItem(regChest, _, _, 2, true)
-    local cCount = 1
+    local index = 1
+    while true do
+        local sProduct = iUtils.FirstItem(regChest, _, _, index, true, true)
 
-    if ready then
-        print("Next, enter an amount of your product to sell.")
-        product.count = tonumber(read())
-        print("Next, enter an amount of the item to receive for your product.")
-        cost.count = tonumber(read())
-    else
-        print("Please enter a specific item in the register chest to add to your list of products.")
-        product = DetectAddedItem(regChest, true)
-        print("Next, enter an amount (number) of your product to sell")
-        pCount = tonumber(read())
-        print("Next, please enter a specific item to set as your product's payment")
-        cost = DetectAddedItem(regChest, true)
-        print("Next, enter an amount of the item to receive for your product")
-        cCount = tonumber(read())
+        if sProduct == nil then 
+            if index == 1 then 
+                print("Insert a product item and a cost item") 
+            end
+            return
+        end
+
+        local sCost = iUtils.FirstItem(regChest, _, _, index + 1, true, true)
+        if sCost == nil then print("Product " .. sProduct.displayName .. " is missing a cost item.") return end
+        
+        if sCost ~= nil then
+            table.insert(stockItems, {product=sProduct,cost=sCost}) 
+            index = index + 2
+        end
     end
 
-    while true do
-        PrintExchange(product,cost)
-        Blit(" Add product and cost to system? y/n", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "ffffffffffffffffffffffffffffffffffff")
+    return stockItems
+end
+
+-- *Stock meaning the idea of a product and a cost together
+
+-- Add Item will check inside of the register chest in a 1 and 2, item and price fashion
+-- Example Will find the first item inside of the register chest and mark that as the item to sell
+-- And then will find the second item after the first item to mark as the cost of that product
+-- With every finished whole stock* move to the next occupied slot and mark as a product and cost
+
+
+-- Add any products into a product list thats numerically indexed and any of the product
+-- costs into a symmetrically indexed product cost list
+-- Will then ask which stock that were found to actually register
+-- And then ask to specify amounts of these items being traded,
+-- Example, if player added 1 diamond pickaxe and then 3 iron ingot in the register chest the amounts of that item are voided
+-- and asked for specifically how much of each to avoid actually requiring the whole cost in order to register
+local function AddItem()
+    local stockItems = FindRegItems()
+    if stockItems == nil then return end
+    for key, stockItem in pairs(stockItems) do
+        PrintExchange(stockItem.product, stockItem.cost)
         print()
-        local input = read():lower()
-        if input == "y" then
-            RegisterStock(product, cost)
-            return true
-        elseif input == "n" then
-            -- dont do stuff
-            return false
-        end
     end
 end
 
