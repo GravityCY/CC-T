@@ -2,7 +2,6 @@ local pUtils = require(".lib.periphutils")
 
 local modem = pUtils.GetWifiModem()
 local modemAddr = peripheral.getName(modem)
-print(modemAddr)
 rednet.open(modemAddr)
 
 -- Remember to disallow sending items to the same id 

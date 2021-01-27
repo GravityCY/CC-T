@@ -28,13 +28,26 @@ local function StringifyProduct(product)
     local str = ""
 
     str = str .. "Product: \\READONLY\n" 
-    str = str .. "ID = " .. product.product.name .. "\n"
-    str = str .. "Amount = \\READONLY" .. product.product.count .. "\n"
+    str = str .. "  ID = \\READONLY" .. product.name .. "\n"
+    str = str .. "  Amount = \\READONLY" .. product.count .. "\n"
 
     str = str .. "Cost: \\READONLY\n" 
-    str = str .. "ID = \\READONLY" .. product.cost.name .. "\n"
-    str = str .. "Amount = \\READONLY" .. product.cost.count .. "\n"
-    return
+    str = str .. "  ID = \\READONLY" .. product.cost.name .. "\n"
+    str = str .. "  Amount = \\READONLY" .. product.cost.count .. "\n"
+    return str
+end
+
+local function UnstringifyProduct(product, str)
+    local lines = {}
+    for strng in str:gmatch("[^\n]+") do
+        table.insert(lines, strng)
+    end
+    product.name = lines[2]:sub(8)
+    product.count = tonumber(lines[3]:sub(12))
+    product.cost.name = lines[5]:sub(8)
+    product.cost.count = tonumber(lines[6]:sub(12))
+
+    return product
 end
 
 local function PrintItem(item, compact)
@@ -82,14 +95,14 @@ local function PrintItem(item, compact)
 end
 
 -- prints the product and the cost
-local function PrintTransaction(product, cost, detail)
+local function PrintTransaction(product, detail)
     if detail then 
         term.clear()
         term.setCursorPos(1,1)
         termUtils.Blit("Product: ", colors.blue)
         PrintItem(product)
         termUtils.Blit("Cost: ", colors.blue)
-        PrintItem(cost)
+        PrintItem(product.cost)
     else
         local pEnchants = ""
         local cEnchants = ""
@@ -97,16 +110,21 @@ local function PrintTransaction(product, cost, detail)
         if product.enchantments ~= nil then
             pEnchants = " (With Enchants)"
         end
-        if cost.enchantments ~= nil then
+        if product.cost.enchantments ~= nil then
             cEnchants = " (With Enchants)"
         end
         
         termUtils.Blit("Give ", colors.red)
         write(product.count .. " " .. product.displayName  .. pEnchants)
         termUtils.Blit(" For ", colors.red)
-        write(cost.count .. " "  .. cost.displayName .. cEnchants)
+        write(product.cost.count .. " "  .. product.cost.displayName .. cEnchants)
     end
     print()
+end
+
+local function ToProduct(productItem, costItem)
+    productItem.cost = costItem
+    return productItem 
 end
 
 local function List(unregistered, detail)
@@ -114,10 +132,10 @@ local function List(unregistered, detail)
     detail = detail or false
     if unregistered then
         print("Listing unregisted items...")
-        for index, stock in ipairs(unregistered_products) do
+        for index, product in ipairs(unregistered_products) do
             termUtils.Blit("Product #" .. index, colors.black, colors.white)
             write(" ")
-            PrintTransaction(stock.product, stock.cost, detail)
+            PrintTransaction(product, detail)
         end
     end
 end
@@ -140,20 +158,15 @@ local function EditProductGUI(unregistered, id)
     if unregistered then
         if id >= 1 and id <= #unregistered_products then
             local product = unregistered_products[id]
-            termUtils.Edit(Serialize(product))
+            product = UnstringifyProduct(product, termUtils.Edit(StringifyProduct(product)))
         else termUtils.BlitLine("ID does not exist.", colors.red) end
     end
 end
 
-local function SelectProduct(unregistered)
-    
-end
-
-local function RegisterProduct(product, cost)
+local function RegisterProduct(product)
     print("Registered Product.")
-    local pString = ItemToString(product)
-    local cString = ItemToString(cost)
-    rednet.send(serverID, "+ " .. os.getComputerID() .. " " .. pString .. " " .. cString, "ts")
+    local pString = textutils.serialise(product)
+    rednet.send(serverID, "+ " .. os.getComputerID() .. " " .. pString, "ts")
 end
 
 -- Will try to find items in series in the registry chest
@@ -173,13 +186,12 @@ local function FindRegItems()
         if sCost == nil then 
             termUtils.Blit("Product ", colors.red)
             termUtils.Blit(sProduct.displayName, colors.white) 
-            termUtils.Blit(" is missing a cost item.", colors.red) 
-            print()
+            termUtils.BlitLine(" is missing a cost item.", colors.red) 
             return 
         end
         
         if sCost ~= nil then
-            table.insert(productItems, {product=sProduct,cost=sCost}) 
+            table.insert(productItems, ToProduct(sProduct, sCost)) 
             index = index + 2
         end
     end
@@ -211,7 +223,7 @@ local function AddProduct()
     unregistered_products = products
     for index, product in pairs(products) do
         write("Added ")
-        termUtils.Blit(product.product.displayName, colors.red)
+        termUtils.Blit(product.displayName, colors.red)
         write(" to unregistered items.\n") 
     end
 end

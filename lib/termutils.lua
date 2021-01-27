@@ -158,7 +158,7 @@ function termutils.Edit(text)
 
     term.clear()
     term.setCursorPos(1,1)
-    return sUtils.TableToString(lines)
+    return sUtils.TableToString(lines, _, _, true)
 end
 
 return termutils
