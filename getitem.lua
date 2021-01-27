@@ -3,7 +3,7 @@ local sUtils = require(".lib.stringutils")
 
 local arg = {...}
 local inputNum = tonumber(arg[#arg])
-local inputAddr = iUtils.
+local inputAddr = ""
 local itemName = ""
 local itemCount = 2304
 

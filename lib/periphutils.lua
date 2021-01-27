@@ -40,24 +40,61 @@ function periphutils.GetWifiModem()
     end
 end
 
-function peripheral.find(name, notComputer)
-    notComputer = notComputer or false
-    
-    local found = {prevFind(name)}
-    
-    local uFound = {}
-    local foundAddr = {}
+function periphutils.ToAddrs(periphs)
+    local addrs = {}
+    for key, periph in pairs(periphs) do 
+        table.insert(addrs, peripheral.getName(periph))
+    end
+    return addrs
+end
 
-    for index, periph in ipairs(found) do
-        local addr = peripheral.getName(periph)
-        if not PeriphIsSide(addr) then
-            if foundAddr[addr] == nil then
-                table.insert(uFound, periph)
-                foundAddr[addr] = true
+function periphutils.Find(name, asAddr, notSide)
+    if name == nil then return end
+    asAddr = asAddr or false
+    notSide = notSide or false
+    
+    local periphsAddr = peripheral.getNames()
+    local found = {}
+
+    for index, periphAddr in ipairs(periphsAddr) do
+        local type = peripheral.getType(periphAddr)
+        local toAdd = false
+        if type == name then
+            if notSide then 
+                if not PeriphIsSide(periphAddr) then toAdd = true end
+            else toAdd = true end
+            if toAdd then
+                if asAddr then table.insert(found, periphAddr)
+                else table.insert(found, peripheral.wrap(periphAddr)) end
             end
         end
     end
-    return unpack(uFound)
+    return unpack(found)
 end
+
+-- function periphutils.Find(name, notSide)
+--     notSide = notSide or false
+    
+--     local found = {peripheral.find(name)}
+    
+--     local uFound = {}
+--     local foundAddr = {}
+
+--     for index, periph in ipairs(found) do
+--         local addr = peripheral.getName(periph)
+--         if foundAddr[addr] == nil then
+--             if notSide then 
+--                 if not PeriphIsSide(addr) then
+--                     table.insert(uFound, periph)
+--                     foundAddr[addr] = true
+--                 end
+--             else
+--                 table.insert(uFound,periph)
+--                 foundAddr[addr] = true
+--             end
+--         end
+--     end
+--     return unpack(uFound)
+-- end
 
 return periphutils

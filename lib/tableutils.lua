@@ -1,4 +1,6 @@
-function table.SizeOf(tab)
+local tableutils = {}
+
+function tableutils.SizeOf(tab)
     local s = 0
     for k,v in pairs(tab) do
         s = s + 1
@@ -6,22 +8,22 @@ function table.SizeOf(tab)
     return s
 end
 
-function table.AddKeyValue(tab, key, value)
+function tableutils.AddKeyValue(tab, key, value)
     tab[key] = value
 end
 
-function table.ContainsKey(tab, key)
+function tableutils.ContainsKey(tab, key)
     return tab[key] ~= nil
 end
 
-function table.GetNotThis(tab, ...)
+function tableutils.GetNotThis(tab, ...)
     local notThese = table.ToKeyTable({...})
     for k,v in pairs(tab) do
         if not table.ContainsKey(notThese, v) then return v end
     end
 end
 
-function table.ToKeyTable(tab, value)
+function tableutils.ToKeyTable(tab, value)
     value = value or true
     local keyTab = {}
     for k,v in pairs(tab) do
@@ -29,3 +31,16 @@ function table.ToKeyTable(tab, value)
     end
     return keyTab
 end
+
+function tableutils.Range(tab, from, to)
+    from = from or 1
+    to = to or #tab
+
+    local newTab = {}
+    for index, value in ipairs(tab) do
+        if index >= from and index <= to then table.insert(newTab, value) end
+    end
+    return newTab
+end
+
+return tableutils
