@@ -2,20 +2,19 @@ local sUtils = require(".lib.stringutils")
 
 local termutils = {}
 
+local maxX, maxY = term.getSize()
+
+
 function termutils.Blit(text, textColor, backColor)
     textColor = textColor or colors.white
     backColor = backColor or colors.black
-    
-    local maxX, maxY = term.getSize()
-    local termX, termY = term.getCursorPos()
-    if termX >= maxX or termX + #text >= maxX then term.setCursorPos(1, termY+1) end
-    local colorText = ""
-    local backText = ""
-    for i = 1, #text do
-        colorText = colorText .. colors.toBlit(textColor)
-        backText = backText .. colors.toBlit(backColor)
-    end
-    term.blit(text, colorText, backText)
+    local prevTextColor = term.getTextColor()
+    local prevBackColor = term.getBackgroundColor()
+    term.setTextColor(textColor)
+    term.setBackgroundColor(backColor)
+    write(text)
+    term.setTextColor(prevTextColor)
+    term.setBackgroundColor(prevBackColor)
 end
 
 function termutils.BlitLine(text, textColor, backColor)
@@ -27,118 +26,167 @@ function termutils.Edit(text)
     term.clear()
     term.setCursorPos(1,1)
 
-    write(text:gsub("\\READONLY", ""))
-
     local lines = {}                                                                                                                        
-    local min = {}
+    local lineMin = {}
+    local posX, posY = term.getCursorPos()
+    local maxX, maxY = term.getSize()
+    local scrollX, scrollY = 0, 0
     for str in text:gmatch("[^\n]+") do
-        local readOnly = str:find("\\READONLY")
-        if readOnly ~= nil then
-            table.insert(min, readOnly)
+        local minX = str:find("\\READONLY")
+        if minX ~= nil then
+            table.insert(lineMin, minX)
             str=str:gsub("\\READONLY", "")
         end
         table.insert(lines, str)
     end
 
-    local x, y = term.getCursorPos()
-    local maxX, maxY = term.getSize()
-
-    local function GetMinX(index)
-        local min = min[index]
-        if min == nil then return 1 end
-        return min
+    local function Write(str)
+        write(str:sub(scrollX + 1, maxX + scrollX))
     end
 
-    local function GetMinY()
-        return 1
+    local function WriteLine(str)
+        write(str:sub(scrollX + 1, maxX + scrollX) .. "\n")
     end
 
-    local function GetMaxX()
-        return maxX
+    local function UpdateLines()
+        term.clear()
+        term.setCursorPos(1,1)
+        for index, line in ipairs(lines) do
+            if index >= scrollY and index <= maxY then
+                WriteLine(line)
+            end
+        end
+        term.setCursorPos(posX, posY)
     end
 
-    local function GetMaxY()
-        return maxY
+    local function SetScroll(x,y)
+        x = x or scrollX
+        y = y or scrollY
+
+        if x < 0 then x = 0 end
+        if y < 0 then y = 0 end
+
+        scrollX, scrollY = x, y
+
+        UpdateLines()
+    end
+
+    local function Scroll(x,y)
+        x = x or 0
+        y = y or 0
+
+        SetScroll(scrollX + x, scrollY + y)        
+        UpdateLines()
+    end
+
+    local function RawX()
+        return posX + scrollX
+    end
+
+    local function RawY()
+        return posY + scrollY
+    end 
+
+    local function X()
+        return posX
+    end
+
+    local function Y()
+        return posY
+    end
+
+    local function SetCursorPos(x,y)
+        x = x or X()
+        y = y or Y()
+        SetScroll(X() - maxX, Y() - maxY)
+        posX, posY = x - scrollX, y - scrollY
+        term.setCursorPos(X(), Y())
     end
 
     local function Up()
-        if y - 1 < GetMinY() then return end
-        local upLineLength = #lines[y - 1]
-        if x > upLineLength then
-            term.setCursorPos(upLineLength + 1, y - 1) 
-            x = upLineLength + 1
-        elseif x < GetMinX(y - 1) then
-            local pos = GetMinX(y - 1)
-            term.setCursorPos(pos, y - 1)
-            x = pos
-        else term.setCursorPos(x, y - 1) end
-        y = y - 1
+        if RawY() - 1 < 1 then return end
+        local upLineLength = #lines[RawY() - 1]
+        local upLineMin = lineMin[RawY() - 1]
+        if upLineMin ~= nil and RawX() < upLineMin then
+            SetCursorPos(upLineMin, Y() - 1)
+        end
+        if RawX() > upLineLength then
+            SetCursorPos(upLineLength + 1, Y() - 1)
+        else SetCursorPos(_, Y() - 1) end
     end
 
     local function Down()
-        if y + 1 > GetMaxY() or y + 1 > #lines then return end
-        local downLineLength = #lines[y + 1]
-        if x > downLineLength then
-            term.setCursorPos(downLineLength + 1, y + 1) 
-            x = downLineLength + 1
-        elseif x < GetMinX(y + 1) then
-            local pos = GetMinX(y + 1)
-            term.setCursorPos(pos, y + 1)
-            x = pos
-        else term.setCursorPos(x, y + 1) end
-        y = y + 1
+        if RawY() + 1 > #lines then return end
+        local downLineLength = #lines[RawY() + 1]
+        local downLineMin = lineMin[RawY() + 1]
+        if downLineMin ~= nil and RawX() < downLineMin then
+            SetCursorPos(downLineMin, RawY() + 1)
+        end
+        if RawX() > downLineLength then
+            SetCursorPos(downLineLength + 1, posY + 1)
+        else SetCursorPos(_, RawY() + 1) end
     end
 
     local function Right()
-        if x + 1 > GetMaxX() or x + 1 > #lines[y] + 1 then return end
-        term.setCursorPos(x + 1,y)
-        x = x + 1
+        if RawX() > #lines[RawY()] then return end
+        if X() == maxX then Scroll(1) 
+        else
+            term.setCursorPos(X() + 1, Y())
+            posX = X() + 1
+        end
     end
 
     local function Left()
-        if x - 1 < GetMinX(y) then return end
-        term.setCursorPos(x - 1,y)
-        x = x - 1
+        local lineMin = lineMin[RawY()]
+        if RawX() - 1 < 1 or (lineMin ~= nil and RawX() == lineMin) then return end
+        if posX == 1 then Scroll(-1)
+        else
+            term.setCursorPos(posX - 1, posY)
+            posX = posX - 1
+        end
     end
 
     local function Backspace()
-        local line = lines[y]
-        local minLine = GetMinX(y)
-        if line == nil or line == "" or x == minLine then return end
-        if x == #line+1 then line = line:sub(1, #line-1)
-        else line = line:sub(1, x - 2) .. line:sub(x, #line) end
-        lines[y] = line
+        local line = lines[RawY()]
+        local minLine = lineMin[RawY()]
+        if line == "" or (minLine ~= nil and RawX() == minLine) then return end
+        if RawX() == #line + 1 then line = line:sub(1, #line-1)
+        else line = line:sub(1, RawX() - 2) .. line:sub(RawX(), #line) end
+        lines[RawY()] = line
         term.clearLine()
-        term.setCursorPos(1,y)
-        write(line)
+        term.setCursorPos(1, posY)
+        Write(line)
         Left()
     end
 
     local function Delete()
-        local line = lines[y]
-        if line == nil or line == "" or x == #line+1 then return end
-        if x == 1 then line = line:sub(2)
-        elseif x == #line then line = line:sub(1, #line-1)
-        else line = line:sub(1, x - 1) .. line:sub(x + 1, #line) end
-        lines[y] = line
+        local line = lines[RawY()]
+        if line == "" or RawX() == #line+1 then return end
+        if RawX() == 1 then line = line:sub(2)
+        elseif RawX() == #line then line = line:sub(1, #line-1)
+        else line = line:sub(1, RawX() - 1) .. line:sub(RawX() + 1, #line) end
+        lines[RawY()] = line
         term.clearLine()
-        term.setCursorPos(1,y)
-        write(line)
-        term.setCursorPos(x,y)
+        term.setCursorPos(1, RawY())
+        Write(line)
+        term.setCursorPos(RawX(), RawY())
     end
 
     local function Type(char)
-        local line = lines[y]
-        if x == GetMinX() then line = char .. line
-        elseif x == #line+1 then line = line .. char
-        else line = line:sub(1, x - 1) .. char .. line:sub(x, #line) end
-        lines[y] = line
+        local line = lines[RawY()]
+        if RawX() == 1 then line = char .. line
+        elseif RawX() == #line + 1 then line = line .. char
+        else line = line:sub(1, RawX() - 1) .. char .. line:sub(RawX(), #line) end
+        lines[RawY()] = line
         term.clearLine()
-        term.setCursorPos(1,y)
-        write(line)
-        term.setCursorPos(x,y)
+        term.setCursorPos(1, Y())
+        Write(line)
+        term.setCursorPos(X(), Y())
         Right()
     end
+
+    posX = lineMin[1]
+    UpdateLines()
 
     while true do
         term.setCursorBlink(true)

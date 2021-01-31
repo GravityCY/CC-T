@@ -72,29 +72,4 @@ function periphutils.Find(name, asAddr, notSide)
     return unpack(found)
 end
 
--- function periphutils.Find(name, notSide)
---     notSide = notSide or false
-    
---     local found = {peripheral.find(name)}
-    
---     local uFound = {}
---     local foundAddr = {}
-
---     for index, periph in ipairs(found) do
---         local addr = peripheral.getName(periph)
---         if foundAddr[addr] == nil then
---             if notSide then 
---                 if not PeriphIsSide(addr) then
---                     table.insert(uFound, periph)
---                     foundAddr[addr] = true
---                 end
---             else
---                 table.insert(uFound,periph)
---                 foundAddr[addr] = true
---             end
---         end
---     end
---     return unpack(uFound)
--- end
-
 return periphutils

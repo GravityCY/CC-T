@@ -154,7 +154,7 @@ end
 
 function invUtils.FirstItemSlot(inventory, startIndex, endIndex, position)
     startIndex = startIndex or 1
-    endIndex = endIndex or inventory.Size()
+    endIndex = endIndex or inventory.size()
     position = position or 1
 
     local firstSlot = nil
@@ -164,6 +164,17 @@ function invUtils.FirstItemSlot(inventory, startIndex, endIndex, position)
         end
     end
     return firstSlot
+end
+
+function invUtils.FirstEmpty(inventory, startIndex, endIndex)
+    startIndex = startIndex or 1
+    endIndex = endIndex or inventory.size()
+
+    local items = inventory.list()
+    for i = startIndex, endIndex do
+        local item = items[i]
+        if item == nil then return i end
+    end
 end
 
 -- Converts an id with _ to space and and first letters to uppercase
