@@ -1,32 +1,17 @@
+local iUtils = require(".lib.invutils")
+local tUtils = require(".lib.tableutils")
+local sUtils = require(".lib.stringutils")
 local pUtils = require(".lib.periphutils")
 local termUtils = require(".lib.termutils")
-local sUtils = require(".lib.stringutils")
-local iUtils = require(".lib.invutils")
 
 local modem = pUtils.GetWifiModem()
 rednet.open(peripheral.getName(modem))
 
-local terminal = false
+local commands = {list_stores="list_stores", list_prod="list_prod"}
 
-local out_commands = {list_stores="list_stores", list_prod="list_prod"}
 local serverID = 5
 
-local xSize, ySize = term.getSize()
-
-function PrintHelp()
-    print("-- Commands --")
-    if terminal then
-        for _, command in pairs(commands) do
-            print(command)
-        end
-    end
-    for _, command in pairs(out_commands) do
-        print(command)
-    end
-    print()
-end
-
-function PrintItem(item, compact)
+local function PrintItem(item, compact)
     compact = compact or false
     if compact then 
         -- Blit("ID:", "eee", "fff")
@@ -71,7 +56,7 @@ function PrintItem(item, compact)
 end
 
 -- prints the product and the cost
-function PrintTransaction(product, detail, reverse)
+local function PrintTransaction(product, detail, reverse)
     local prod = nil
     local cost = nil
     if reverse then
@@ -108,7 +93,7 @@ function PrintTransaction(product, detail, reverse)
     write("\n")
 end
 
-function PrintProducts(products, detail, reverse)
+local function PrintProducts(products, detail, reverse)
     term.clear()
     term.setCursorPos(1,1)
     for index, product in ipairs(products) do
@@ -119,7 +104,7 @@ function PrintProducts(products, detail, reverse)
     write("\n")
 end
 
-function PrintStores(stores)
+local function PrintStores(stores)
     term.clear()
     term.setCursorPos(1,1)
     for index, storeName in ipairs(stores) do
@@ -131,77 +116,38 @@ function PrintStores(stores)
     write("\n")
 end
 
-function ListProducts(pseudo)
+local function ListProducts(pseudo)
     rednet.send(serverID, "gp " .. pseudo, "ts")
     local id, products = rednet.receive("gp")
     PrintProducts(textutils.unserialise(products), false, true)
 end
 
-function ListStores()
+local function ListStores()
     rednet.send(serverID, "gs", "ts")
     local id, stores = rednet.receive("gs")
     PrintStores(textutils.unserialise(stores))
 end
 
--- Will try to find items in series in the registry chest
-function FindRegItems()
-    local productItems = {}
-
-    local index = 1
-    while true do
-        local sProduct = iUtils.FirstItem(regChest, _, _, index, true, true)
-
-        if sProduct == nil then 
-            if index == 1 then return 
-            else break end
-        end
-
-        local sCost = iUtils.FirstItem(regChest, _, _, index + 1, true, true)
-        if sCost == nil then 
-            termUtils.Blit("Product ", colors.red)
-            termUtils.Blit(iUtils.ToDisplayName(sProduct.name), colors.white) 
-            termUtils.BlitLine(" is missing a cost item.", colors.red) 
-            return 
-        end
-        
-        if sCost ~= nil then
-            table.insert(productItems, ToProduct(sProduct, sCost)) 
-            index = index + 2
-        end
+local function PrintHelp()
+    print("-- Commands --")
+    for _, command in pairs(commands) do
+        print(command)
     end
-
-    return productItems
 end
 
-function Interface()
-    if commands ~= nil then terminal = true end
-
-    if terminal then termUtils.BlitLine("Welcome aboard TTOS :)", colors.green)
-    else termUtils.BlitLine("Welcome to TTSOS", colors.green) end
+local function Interface()
+    termUtils.BlitLine("Welcome to TTSOS", colors.green)
 
     while true do
         PrintHelp()
         local input = sUtils.StringToTable(read())
         local command = input[1]
-        if terminal then
-            if command == commands.add_product then
-            AddProduct()
-            elseif command == commands.register_product then
-                RegisterProduct(tonumber(input[2]))
-            elseif command == commands.list_unreg then
-                List(true, false)
-            elseif command == commands.edit_unreg then
-                local id = tonumber(input[2])
-                local editArgs = tUtils.Range(input, 3)
-                if id == nil then termUtils.BlitLine("EDITGUI SELECTION", colors.yellow)
-                elseif type(id) == "number" then EditProduct(true, id, editArgs)
-                else termUtils.BlitLine("ID needs to be a number", colors.red) end
-            end
-        end
-        if command == out_commands.list_stores then
+        if command == commands.list_stores then
             ListStores()
-        elseif command == out_commands.list_prod then
+        elseif command == commands.list_prod then
             ListProducts(input[2])
         end
     end
 end
+
+Interface()

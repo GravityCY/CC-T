@@ -14,6 +14,6 @@ if inputNum ~= nil then
 else itemName = sUtils.TableToString(arg) end
 
 if itemName == nil then print("Please enter an Item Name.") return end
-local foundCount = iUtils.GetItem(inputAddr,itemName,itemCount)
+local foundCount = iUtils.GetItem(inputAddr, iUtils.GetAllChests(false, true), itemName, itemCount)
 
 print("Put " .. foundCount .. " " .. itemName .. " inside of " .. inputAddr)

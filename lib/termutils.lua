@@ -88,17 +88,16 @@ function termutils.Edit(text)
     end 
 
     local function X()
-        return posX
+        return posX % maxX
     end
 
     local function Y()
-        return posY
+        return posY % maxX
     end
 
-    local function SetCursorPos(x,y)
+    local function SetCursorPos(x, y)
         x = x or X()
         y = y or Y()
-        SetScroll(X() - maxX, Y() - maxY)
         posX, posY = x - scrollX, y - scrollY
         term.setCursorPos(X(), Y())
     end
@@ -109,8 +108,7 @@ function termutils.Edit(text)
         local upLineMin = lineMin[RawY() - 1]
         if upLineMin ~= nil and RawX() < upLineMin then
             SetCursorPos(upLineMin, Y() - 1)
-        end
-        if RawX() > upLineLength then
+        elseif RawX() > upLineLength then
             SetCursorPos(upLineLength + 1, Y() - 1)
         else SetCursorPos(_, Y() - 1) end
     end
@@ -139,10 +137,10 @@ function termutils.Edit(text)
     local function Left()
         local lineMin = lineMin[RawY()]
         if RawX() - 1 < 1 or (lineMin ~= nil and RawX() == lineMin) then return end
-        if posX == 1 then Scroll(-1)
+        if X() == 1 then Scroll(-1)
         else
-            term.setCursorPos(posX - 1, posY)
-            posX = posX - 1
+            term.setCursorPos(X() - 1, Y())
+            posX = X() - 1
         end
     end
 

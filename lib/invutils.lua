@@ -9,13 +9,17 @@ local function FormatName(itemName)
 end
 
 -- Will return all currently connected chests
-function invUtils.GetAllChests()
-    return {peripheral.find("minecraft:chest", true)}
+function invUtils.GetAllChests(asAddrs, notSide)
+    asAddrs = asAddrs or false
+    notSide = notSide or true
+    return {pUtils.Find("minecraft:chest", asAddrs, notSide)}
 end
 
-function invUtils.GetItemSlot(inventory, itemName)
-    for slot, item in pairs(inventory.list()) do
-        if item.name == itemName then return slot end
+function invUtils.GetItemSlot(itemName, inventories)
+    for index, inventory in pairs(inventories) do
+        for slot, item in pairs(inventory.list()) do
+            if item.name == itemName then return peripheral.getName(inventory), slot end
+        end
     end
 end
 
@@ -66,10 +70,16 @@ function invUtils.PushAll(from, to)
     end
 end
 
+function invUtils.ItemCount(inventory)
+    local count = 0
+    for slot, item in pairs(inventory.list()) do
+        count = count + item.count
+    end
+    return count
+end
+
 function invUtils.PushAllMulti(from, toInventories)
     if from == nil or toInventories == nil then return end
-
-    amount = amount or 1
 
     for key, inventory in pairs(toInventories) do
         local invAddr = inventory
@@ -87,19 +97,6 @@ function invUtils.IsFull(inventory)
     if inventory == nil then return end
 
     return chestSize == table.SizeOf(inventory.list())
-end
-
--- Will return how many items an inventory has
-function invUtils.ItemCount(inventory)
-    if inventory == nil then return end
-    local tempInventory = inventory
-    if type(inventory) == "string" then tempInventory = peripheral.wrap(inventory) end
-
-    local total = 0
-    for slot, item in pairs(tempInventory.list()) do
-        total = total + item.count 
-    end
-    return total
 end
 
 -- Will return a number signifying how many unique items an inventory has
@@ -152,20 +149,6 @@ function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, d
     end
 end
 
-function invUtils.FirstItemSlot(inventory, startIndex, endIndex, position)
-    startIndex = startIndex or 1
-    endIndex = endIndex or inventory.size()
-    position = position or 1
-
-    local firstSlot = nil
-    for slot, item in pairs(inventory.list()) do
-        if slot >= startIndex and slot <= endIndex then 
-            if firstSlot == nil or slot < firstSlot then firstSlot = slot end
-        end
-    end
-    return firstSlot
-end
-
 function invUtils.FirstEmpty(inventory, startIndex, endIndex)
     startIndex = startIndex or 1
     endIndex = endIndex or inventory.size()
@@ -184,11 +167,10 @@ function invUtils.ToDisplayName(itemName)
 end
 
 -- Will return an amount of an item
-function invUtils.CountItem(itemName, ...)
-    local chests = invUtils.GetAllChests()
+function invUtils.CountItemName(itemName, inventories)
     local count = 0
     itemName = itemName:lower()
-    for i, chest in ipairs(chests) do
+    for i, chest in ipairs(inventories) do
         for slot, item in pairs(chest.list()) do
             local formatName = FormatName(item.name)
             if formatName ~= nil and formatName == itemName then
@@ -199,13 +181,45 @@ function invUtils.CountItem(itemName, ...)
     return count
 end
 
+-- Will return an amount of an item
+function invUtils.CountItem(item, detailed, inventories)
+    local count = 0
+    for i, chest in ipairs(inventories) do
+        local items = chest.list()
+        if detailed then
+            for slot = 1, chest.size() do
+                if items[slot] ~= nil then
+                    local cItem = chest.getItemDetail(slot)
+                    local same = false
+                    for key, value in pairs(item) do
+                        if key ~= "count" then 
+                            same = cItem[key] == value 
+                        end
+                    end
+                    if same then count = count + cItem.count end
+                end
+            end
+        else
+            for slot, cItem in pairs(chest.list()) do
+                local same = false
+                for key, value in pairs(item) do
+                    if key ~= "count" then 
+                        same = cItem[key] == value 
+                    end
+                end
+                if same then count = count + cItem.count end
+            end
+        end
+    end
+    return count
+end
+
 -- Will get an item based on registed id
 -- Possible way to improve is to estimate similarity of id to provided item name and work with that
-function invUtils.GetItem(inputAddr, itemName, itemCount)
-    local chests = invUtils.GetAllChests()
+function invUtils.GetItem(inputAddr, inventories, itemName, itemCount)
     itemName = itemName:lower()
     local foundCount = 0
-    for index,chest in ipairs(chests) do
+    for index, chest in ipairs(inventories) do
         local chestAddr = peripheral.getName(chest)
         if chestAddr ~= inputAddr then
             for slot, item in pairs(chest.list()) do
@@ -222,20 +236,22 @@ function invUtils.GetItem(inputAddr, itemName, itemCount)
 end
 
 -- Will get an item based on display name but is WAY slower
-function invUtils.GetItemSlow(inputAddr, itemName, itemCount)
-    local chests = invUtils.GetAllChests()
+function invUtils.GetItemSlow(inputAddr, inventories, itemName, itemCount)
     itemName = itemName:lower()
 
     local foundCount = 0
-    for index,chest in ipairs(chests) do
+    for index,chest in ipairs(inventories) do
         local chestAddr = peripheral.getName(chest)
         if chestAddr ~= inputAddr then
+            local items = chest.list()
             for slot = 1, chest.size() do
-                local item = chest.getItemDetail(slot)
-                if item ~= nil and item.displayName:lower() == itemName then
-                    local sentCount = chest.pushItems(inputAddr, slot, itemCount - foundCount)
-                    foundCount = foundCount + sentCount
-                    if foundCount == itemCount then return foundCount end
+                if items[slot] ~= nil then
+                    local item = chest.getItemDetail(slot)
+                    if item.displayName:lower() == itemName then
+                        local sentCount = chest.pushItems(inputAddr, slot, itemCount - foundCount)
+                        foundCount = foundCount + sentCount
+                        if foundCount == itemCount then return foundCount end
+                    end
                 end
             end
         end
@@ -243,11 +259,10 @@ function invUtils.GetItemSlow(inputAddr, itemName, itemCount)
     return foundCount
 end
 
-function invUtils.ListItems(filter)
+function invUtils.ListItems(filter, inventories)
     if filter ~= nil then filter = filter:lower() end
     local items = {}
-    local chests = invUtils.GetAllChests()
-    for i, chest in ipairs(chests) do
+    for i, chest in ipairs(inventories) do
         for slot, item in pairs(chest.list()) do
             local formName = FormatName(item.name)
             if filter ~= nil then

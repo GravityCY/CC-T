@@ -1,7 +1,5 @@
 local periphutils = {}
 
-local prevFind = peripheral.find
-
 local function PeriphIsSide(addr)
     return addr == "top" or addr == "left" or addr == "right" or addr == "bottom" or addr == "back" or addr == "front"
 end
