@@ -32,11 +32,11 @@ local function ReceiveReply()
     while true do
         local computerId, message
         if not receive then
-            computerId, message = rednet.receive(_, 2)
+            computerId, message = rednet.receive(_, 10)
             if computerId == nil or message == nil then break end
             receive = true 
         else
-            computerId, message = rednet.receive(_, 2)
+            computerId, message = rednet.receive(_, 10)
             if computerId == nil or message == nil then break end
         end
         print(" " .. message)

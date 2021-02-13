@@ -70,6 +70,7 @@ function invUtils.PushAll(from, to)
     end
 end
 
+-- Will get total of all items combined in an inventory
 function invUtils.ItemCount(inventory)
     local count = 0
     for slot, item in pairs(inventory.list()) do
@@ -78,6 +79,7 @@ function invUtils.ItemCount(inventory)
     return count
 end
 
+-- Will try to push all items from a single inventory to multiple inventories
 function invUtils.PushAllMulti(from, toInventories)
     if from == nil or toInventories == nil then return end
 
@@ -113,7 +115,7 @@ end
 
 -- Literally just re-adds every single item in a inventory in hopes that if there is the same item
 -- at different slots it'll just stack them
-function invUtils.Merge(inventory, inventoryAddr)
+function invUtils.Merge(inventory)
     if inventory == nil then return end
     inventoryAddr = inventoryAddr or peripheral.getName(inventory)
 
@@ -122,9 +124,23 @@ function invUtils.Merge(inventory, inventoryAddr)
     end
 end
 
-function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, detailed)
+local function GetInventory(inventory, asAddr)
+    asAddr = asAddr or false
+    
     if inventory == nil then return end
-    if type(inventory) == "string" then inventory = peripheral.wrap(inventory) end
+    local ty = type(inventory)
+    if ty == "string" then 
+        if asAddr then return inventory 
+        else return peripheral.wrap(inventory) end
+    elseif ty == "table" then 
+        if not asAddr then return inventory 
+        else return peripheral.getName(inventory) end 
+    end
+end
+
+function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, detailed)
+    local tempInventory = GetInventory(inventory)
+    if tempInventory == nil then return end
 
     startIndex = startIndex or 1
     endIndex = endIndex or inventory.size()
@@ -132,7 +148,7 @@ function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, d
     asItem = asItem or false
     detailed = detailed or false
 
-    local items = inventory.list()
+    local items = tempInventory.list()
 
     local pos = 1
     for slot = startIndex, endIndex do
@@ -140,7 +156,7 @@ function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, d
         if item ~= nil then 
             if pos == position then
                 if asItem then
-                    if detailed then return inventory.getItemDetail(slot) 
+                    if detailed then return tempInventory.getItemDetail(slot) 
                     else return item end 
                 else return slot end
             end
@@ -149,14 +165,23 @@ function invUtils.FirstItem(inventory, startIndex, endIndex, position, asItem, d
     end
 end
 
-function invUtils.FirstEmpty(inventory, startIndex, endIndex)
+function invUtils.FirstEmpty(inventory, startIndex, endIndex, position, asItem, detailed)
     startIndex = startIndex or 1
     endIndex = endIndex or inventory.size()
+    position = position or 1
+    asItem = asItem or false
+    detailed = detailed or false
+    local tempInventory = GetInventory(inventory)
+    if tempInventory == nil then return end
 
-    local items = inventory.list()
+    local items = tempInventory.list()
+    local pos = 1
     for i = startIndex, endIndex do
         local item = items[i]
-        if item == nil then return i end
+        if item == nil then 
+            if pos == position then return i 
+            else pos = pos + 1 end
+        end
     end
 end
 
@@ -183,6 +208,8 @@ end
 
 -- Will return an amount of an item
 function invUtils.CountItem(item, detailed, inventories)
+    detailed = detailed or false
+    
     local count = 0
     for i, chest in ipairs(inventories) do
         local items = chest.list()
