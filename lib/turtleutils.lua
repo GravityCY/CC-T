@@ -15,7 +15,6 @@ local blankTurtle = "4d1eb2f00be8854cd02b4ae0ca1c04b2"
 local size = 16
 
 local startPath = "/disk/startup.lua"
-local startOperations = ""
 
 local function IsFuel(itemName)
     return fuels[itemName] ~= nil
@@ -130,14 +129,11 @@ function turtleutils.GetInvUpdate(sleepTime)
     end
 end
 
-function turtleutils.SetupTurtle(tSlot, startupCode, startupProgram, libraries)
-
-    local startSlot = turtle.getSelectedSlot()
+function turtleutils.SetupTurtle(programs)
 
     local handler = {}
 
     function handler.PlaceTurtle()
-        turtle.select(tSlot)
         turtle.place()
     end
 
@@ -155,36 +151,38 @@ function turtleutils.SetupTurtle(tSlot, startupCode, startupProgram, libraries)
         turtle.place()
         turtle.select(disk)
         turtle.drop()
-        local startup = fs.open(startPath, "w")
-        startup.write(startOperations)
-        startup.close()
     end 
 
     function handler.RemoveDrive()
         turtle.suck()
         turtle.dig()
-        turtle.select(startSlot)
     end
 
-    function handler.WriteStartCode()
-        if startupCode ~= nil then
-            local startup = fs.open(startPath, "a")
-            startup.write(startupCode .. "\n")
-            startup.close()
+    function handler.SetupDrive()
+        local startup = fs.open(startPath, "w")
+        local toRun = {}
+        for index, startupProgram in ipairs(programs) do
+            local disk_path = "/disk/" .. startupProgram.out_path
+            local output_path = startupProgram.out_path
+            if output_path == "/startup.lua" then disk_path = "/disk/temp/startup.lua" end
+            if startupProgram.run ~= nil then toRun[index] = index end
+            if fs.exists(disk_path) then fs.delete(disk_path) end
+            fs.copy(startupProgram.in_path, disk_path)
+            startup.write("if fs.exists(\"" .. output_path .. "\") then fs.delete(\"" .. output_path .. "\") end \nfs.copy(\"" .. disk_path .. "\", \"" .. output_path .. "\")\n")
         end
-    end
-
-    function handler.WriteStartup()
-        if startupProgram ~= nil then
-            local programFile = fs.open(startupProgram, "r")
-            local programCode = programFile.readAll()
-            local codeEscape = programCode:gsub("\"", "\\\""):gsub("\n", "\\n")
-            local metaCode = "local file = fs.open(\"/startup.lua\", \"w\")\nfile.write(\"" .. codeEscape .. "\")\nfile.close()"
-            programFile.close()
-            local startup = fs.open(startPath, "a")
-            startup.write(metaCode)
-            startup.close()
+        startup.write(programs.start or "")
+        for index, pIndex in ipairs(toRun) do
+            local program = programs[pIndex]
+            local str = nil
+            for index, arg in ipairs(program.run) do
+                local tArg = arg
+                if type(arg) == "string" then tArg = "\"" .. arg .. "\""  end
+                if str == nil then str = tArg
+                else str = str .. ", " .. tArg end
+            end
+            startup.write("shell.run(\"" .. program.out_path .. "\", " .. str .. ")\n")
         end
+        startup.close()
     end
 
     return handler

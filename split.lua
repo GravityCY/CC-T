@@ -9,6 +9,7 @@ while true do
             totalStock = totalStock + item.count
         end
     end
+    
     if totalStock >= #dumpInventories * dumpInvSize then
         print("Splitting.")
         local split = totalStock / #dumpInventories

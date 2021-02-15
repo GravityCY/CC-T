@@ -1,4 +1,6 @@
-local stringUtils = require("lib/stringutils")
-local arg = {...}
-
-print(stringUtils.TableToString(arg,1, #arg-1))
+fs.makeDir("/gay")
+local back = http.get("https://www.dropbox.com/s/p2kpl3nkx54qai9/termutils.lua?dl=1")
+local file = fs.open("/gay/termutils.lua", "w")
+file.write(back.readAll())
+file.close()
+back.close()

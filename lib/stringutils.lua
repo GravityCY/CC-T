@@ -4,12 +4,10 @@ function stringutils.Capitalize(word)
     return word:gsub("(%l)(%w+)", function(a,b) return string.upper(a)..b end)
 end
 
-function stringutils.TableToString(table, startIndex, endIndex, newline)
+function stringutils.TableToString(table, startIndex, endIndex, seperator)
     startIndex = startIndex or 1
     endIndex = endIndex or #table
-    newline = newline or false
-    local seperator = ""
-    if newline then seperator = "\n" else seperator = " " end
+    seperator = seperator or " "
     local final = nil
     for index, word in ipairs(table) do
         if index >= startIndex and index <= endIndex then
